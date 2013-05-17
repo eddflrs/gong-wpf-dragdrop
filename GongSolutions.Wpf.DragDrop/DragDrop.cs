@@ -510,29 +510,14 @@ namespace GongSolutions.Wpf.DragDrop
 
         private static bool HitTest4Type<T>(object sender, InputEventArgs e) where T : UIElement
         {
-            var mouseArgs = e as MouseButtonEventArgs;
-            var touchArgs = e as TouchEventArgs;
+            Func<IInputElement, Point> getInputPosition = InputUtilities.GetPositionFunc(e);
 
-            Func<IInputElement, Point> GetInputPosition;
-
-            if (mouseArgs != null)
-            {
-                GetInputPosition = mouseArgs.GetPosition;
-            }
-            else if (touchArgs != null)
-            {                
-                GetInputPosition = (elem) =>
-                    {
-                        TouchPoint touchPoint = touchArgs.GetTouchPoint(elem);
-                        return touchPoint.Position;
-                    };
-            }
-            else
+            if (getInputPosition == null)
             {
                 return false;
             }
 
-            var hit = VisualTreeHelper.HitTest((Visual)sender, GetInputPosition((IInputElement)sender));
+            var hit = VisualTreeHelper.HitTest((Visual)sender, getInputPosition((IInputElement)sender));
             if (hit == null)
             {
                 return false;
@@ -577,7 +562,6 @@ namespace GongSolutions.Wpf.DragDrop
         private static void DragSource_PreviewMouseLeftButtonDown(object sender, InputEventArgs e)
         {
             var mouseArgs = e as MouseButtonEventArgs;
-            var touchArgs = e as TouchEventArgs;
 
             // Ignore the click if clickCount != 1 or the user has clicked on a scrollbar.
             if ((mouseArgs != null && mouseArgs.ClickCount != 1)
@@ -652,32 +636,12 @@ namespace GongSolutions.Wpf.DragDrop
 
         private static void DragSource_PreviewMouseMove(object sender, InputEventArgs e)
         {
-            var mouseArgs = e as MouseButtonEventArgs;
-            var touchArgs = e as TouchEventArgs;
-            Func<IInputElement, Point> GetInputPosition;
-
-            if (mouseArgs != null)
-            {
-                GetInputPosition = mouseArgs.GetPosition;
-            }
-            else if (touchArgs != null)
-            {
-                GetInputPosition = (elem) =>
-                {
-                    TouchPoint touchPoint = touchArgs.GetTouchPoint(elem);
-                    return touchPoint.Position;
-                };
-            }
-            else
-            {
-                GetInputPosition = (elem) => new Point(0, 0);
-            }
-
+            Func<IInputElement, Point> getInputPosition = InputUtilities.GetPositionFunc(e);
 
             if (m_DragInfo != null && !m_DragInProgress)
             {
                 var dragStart = m_DragInfo.DragStartPosition;
-                var position = GetInputPosition((IInputElement)sender);
+                var position = getInputPosition((IInputElement)sender);
 
                 if (Math.Abs(position.X - dragStart.X) > SystemParameters.MinimumHorizontalDragDistance ||
                     Math.Abs(position.Y - dragStart.Y) > SystemParameters.MinimumVerticalDragDistance)

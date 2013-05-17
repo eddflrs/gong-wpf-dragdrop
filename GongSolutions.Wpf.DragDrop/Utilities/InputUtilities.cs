@@ -12,9 +12,9 @@ namespace GongSolutions.Wpf.DragDrop.Utilities
     /// </summary>
     class InputUtilities
     {
-        public static bool IsMouseButtonArgs(InputEventArgs e)
+        public static bool IsMouseArgs(InputEventArgs e)
         {
-            return null != e as MouseButtonEventArgs;
+            return null != e as MouseEventArgs;
         }
 
         public static bool IsTouchArgs(InputEventArgs e)
@@ -27,14 +27,14 @@ namespace GongSolutions.Wpf.DragDrop.Utilities
         /// an IInputElement.
         /// </summary>
         /// <param name="e">The input event args object</param>
-        /// <returns>Func that takes in IInputElement and returns a Point</returns>
+        /// <returns>Func that takes in IInputElement and returns a point</returns>
         public static Func<IInputElement, Point> GetPositionFunc(InputEventArgs e)
         {
             Func<IInputElement, Point> getPosition = null;
 
-            if (IsMouseButtonArgs(e))
+            if (IsMouseArgs(e))
             {
-                getPosition = ((MouseButtonEventArgs) e).GetPosition;
+                getPosition = ((MouseEventArgs) e).GetPosition;
             }
             else if (IsTouchArgs(e))
             {

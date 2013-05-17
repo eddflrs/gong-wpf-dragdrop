@@ -118,32 +118,12 @@ namespace GongSolutions.Wpf.DragDrop
         /// </param>
         public DragInfo(object sender, InputEventArgs e)
         {
-
             var mouseArgs = e as MouseButtonEventArgs;
-            var touchArgs = e as TouchEventArgs;
+            Func<IInputElement, Point> getInputPosition = InputUtilities.GetPositionFunc(e);
 
-            Func<IInputElement, Point> GetInputPosition;
-
-            if (mouseArgs != null)
-            {
-                GetInputPosition = mouseArgs.GetPosition;
-            }
-            else if (touchArgs != null)
-            {
-                GetInputPosition = (elem) =>
-                    {
-                        TouchPoint touchPoint = touchArgs.GetTouchPoint(elem);
-                        return touchPoint.Position;
-                    };
-            }
-            else
-            {
-                GetInputPosition = (elem) => new Point(0, 0);
-            }
-
-            this.DragStartPosition = GetInputPosition((IInputElement)sender);
+            this.DragStartPosition = getInputPosition((IInputElement)sender);
             this.Effects = DragDropEffects.None;
-            this.MouseButton = (mouseArgs != null) ? mouseArgs.ChangedButton : new MouseButton();
+            this.MouseButton = (mouseArgs != null) ? mouseArgs.ChangedButton : new MouseButton(); // TODO FIX Hackaround
             this.VisualSource = sender as UIElement;
 
             if (sender is ItemsControl)
@@ -163,13 +143,13 @@ namespace GongSolutions.Wpf.DragDrop
                 }
                 if (item == null)
                 {
-                    item = itemsControl.GetItemContainerAt(GetInputPosition(itemsControl), itemsControl.GetItemsPanelOrientation());
+                    item = itemsControl.GetItemContainerAt(getInputPosition(itemsControl), itemsControl.GetItemsPanelOrientation());
                 }
 
                 if (item != null)
                 {
                     // Remember the relative position of the item being dragged
-                    PositionInDraggedItem = GetInputPosition(item);
+                    PositionInDraggedItem = getInputPosition(item);
 
                     var itemParent = ItemsControl.ItemsControlFromItemContainer(item);
 
@@ -199,7 +179,7 @@ namespace GongSolutions.Wpf.DragDrop
             else
             {
                 if (sender is UIElement)
-                    PositionInDraggedItem = GetInputPosition((UIElement)sender);
+                    PositionInDraggedItem = getInputPosition((UIElement)sender);
             }
 
             if (this.SourceItems == null)
