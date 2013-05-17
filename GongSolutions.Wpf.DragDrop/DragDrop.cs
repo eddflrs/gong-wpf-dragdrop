@@ -279,15 +279,27 @@ namespace GongSolutions.Wpf.DragDrop
             if ((bool)e.NewValue == true)
             {
                 uiElement.PreviewMouseLeftButtonDown += DragSource_PreviewMouseLeftButtonDown;
+                uiElement.PreviewTouchDown += DragSource_PreviewMouseLeftButtonDown;
+
                 uiElement.PreviewMouseLeftButtonUp += DragSource_PreviewMouseLeftButtonUp;
+                uiElement.PreviewTouchUp += DragSource_PreviewMouseLeftButtonUp;
+
                 uiElement.PreviewMouseMove += DragSource_PreviewMouseMove;
+                uiElement.PreviewTouchMove += DragSource_PreviewMouseMove;
+
                 uiElement.QueryContinueDrag += DragSource_QueryContinueDrag;
             }
             else
             {
                 uiElement.PreviewMouseLeftButtonDown -= DragSource_PreviewMouseLeftButtonDown;
+                uiElement.PreviewTouchDown += DragSource_PreviewMouseLeftButtonDown;
+
                 uiElement.PreviewMouseLeftButtonUp -= DragSource_PreviewMouseLeftButtonUp;
+                uiElement.PreviewTouchUp += DragSource_PreviewMouseLeftButtonUp;
+
                 uiElement.PreviewMouseMove -= DragSource_PreviewMouseMove;
+                uiElement.PreviewTouchMove += DragSource_PreviewMouseMove;
+
                 uiElement.QueryContinueDrag -= DragSource_QueryContinueDrag;
             }
         }
@@ -496,9 +508,31 @@ namespace GongSolutions.Wpf.DragDrop
             }
         }
 
-        private static bool HitTest4Type<T>(object sender, MouseButtonEventArgs e) where T : UIElement
+        private static bool HitTest4Type<T>(object sender, InputEventArgs e) where T : UIElement
         {
-            var hit = VisualTreeHelper.HitTest((Visual)sender, e.GetPosition((IInputElement)sender));
+            var mouseArgs = e as MouseButtonEventArgs;
+            var touchArgs = e as TouchEventArgs;
+
+            Func<IInputElement, Point> GetInputPosition;
+
+            if (mouseArgs != null)
+            {
+                GetInputPosition = mouseArgs.GetPosition;
+            }
+            else if (touchArgs != null)
+            {                
+                GetInputPosition = (elem) =>
+                    {
+                        TouchPoint touchPoint = touchArgs.GetTouchPoint(elem);
+                        return touchPoint.Position;
+                    };
+            }
+            else
+            {
+                return false;
+            }
+
+            var hit = VisualTreeHelper.HitTest((Visual)sender, GetInputPosition((IInputElement)sender));
             if (hit == null)
             {
                 return false;
@@ -539,11 +573,14 @@ namespace GongSolutions.Wpf.DragDrop
                 }
             }
         }
-
-        private static void DragSource_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+ 
+        private static void DragSource_PreviewMouseLeftButtonDown(object sender, InputEventArgs e)
         {
+            var mouseArgs = e as MouseButtonEventArgs;
+            var touchArgs = e as TouchEventArgs;
+
             // Ignore the click if clickCount != 1 or the user has clicked on a scrollbar.
-            if (e.ClickCount != 1
+            if ((mouseArgs != null && mouseArgs.ClickCount != 1)
                 || HitTest4Type<ScrollBar>(sender, e)
                 || HitTest4Type<TextBoxBase>(sender, e)
                 || HitTest4Type<PasswordBox>(sender, e)
@@ -573,7 +610,7 @@ namespace GongSolutions.Wpf.DragDrop
             }
         }
 
-        private static void DragSource_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private static void DragSource_PreviewMouseLeftButtonUp(object sender, InputEventArgs e)
         {
             // If we prevented the control's default selection handling in DragSource_PreviewMouseLeftButtonDown
             // by setting 'e.Handled = true' and a drag was not initiated, manually set the selection here.
@@ -613,12 +650,34 @@ namespace GongSolutions.Wpf.DragDrop
             return dragHandler ?? DefaultDragHandler;
         }
 
-        private static void DragSource_PreviewMouseMove(object sender, MouseEventArgs e)
+        private static void DragSource_PreviewMouseMove(object sender, InputEventArgs e)
         {
+            var mouseArgs = e as MouseButtonEventArgs;
+            var touchArgs = e as TouchEventArgs;
+            Func<IInputElement, Point> GetInputPosition;
+
+            if (mouseArgs != null)
+            {
+                GetInputPosition = mouseArgs.GetPosition;
+            }
+            else if (touchArgs != null)
+            {
+                GetInputPosition = (elem) =>
+                {
+                    TouchPoint touchPoint = touchArgs.GetTouchPoint(elem);
+                    return touchPoint.Position;
+                };
+            }
+            else
+            {
+                GetInputPosition = (elem) => new Point(0, 0);
+            }
+
+
             if (m_DragInfo != null && !m_DragInProgress)
             {
                 var dragStart = m_DragInfo.DragStartPosition;
-                var position = e.GetPosition((IInputElement)sender);
+                var position = GetInputPosition((IInputElement)sender);
 
                 if (Math.Abs(position.X - dragStart.X) > SystemParameters.MinimumHorizontalDragDistance ||
                     Math.Abs(position.Y - dragStart.Y) > SystemParameters.MinimumVerticalDragDistance)
