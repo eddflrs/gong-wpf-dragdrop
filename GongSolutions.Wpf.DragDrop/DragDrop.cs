@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using System.Xml;
 using GongSolutions.Wpf.DragDrop.Icons;
 using GongSolutions.Wpf.DragDrop.Utilities;
@@ -269,6 +270,33 @@ namespace GongSolutions.Wpf.DragDrop
 
         public static readonly DependencyProperty IsDropTargetProperty =
             DependencyProperty.RegisterAttached("IsDropTarget", typeof(bool), typeof(DragDrop), new UIPropertyMetadata(false, IsDropTargetChanged));
+
+        public static readonly DependencyProperty TouchHoldHandlerProperty =
+            DependencyProperty.RegisterAttached("TouchHoldHandler", typeof(Action<IDragInfo>), typeof(DragDrop));
+
+        public static readonly DependencyProperty TouchUpHandlerProperty =
+            DependencyProperty.RegisterAttached("TouchUpHandler", typeof(Action<IDragInfo>), typeof(DragDrop));
+
+
+        public static void SetTouchUpHandler(UIElement element, Action<IDragInfo> action)
+        {
+            element.SetValue(TouchUpHandlerProperty, action);
+        }
+
+        public static Action<IDragInfo> GetTouchUpHandler(UIElement element)
+        {
+            return (Action<IDragInfo>)element.GetValue(TouchUpHandlerProperty);
+        }
+
+        public static void SetTouchHoldHandler(UIElement element, Action<IDragInfo> action)
+        {
+            element.SetValue(TouchHoldHandlerProperty, action);
+        }
+
+        public static Action<IDragInfo> GetTouchHoldHandler(UIElement element)
+        {
+            return (Action<IDragInfo>)element.GetValue(TouchHoldHandlerProperty);
+        }
 
         public static readonly DataFormat DataFormat = DataFormats.GetDataFormat("GongSolutions.Wpf.DragDrop");
 
@@ -558,10 +586,38 @@ namespace GongSolutions.Wpf.DragDrop
                 }
             }
         }
- 
+
+        private static bool _touchingDown = false;
+        private static bool _isTouchDraggable = false;
+        private static DispatcherTimer _touchdownTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(600)
+        };
+
+        private static void TouchingDownTickHandler(object sender, EventArgs e) 
+        {
+            _touchdownTimer.Stop();
+            _touchdownTimer.Tick -= TouchingDownTickHandler;
+
+            if (_touchingDown)
+            {
+                // Do something we are touching down.
+                _isTouchDraggable = true;
+            }
+
+            _touchingDown = false;
+        }
+
         private static void DragSource_PreviewMouseLeftButtonDown(object sender, InputEventArgs e)
         {
             var mouseArgs = e as MouseButtonEventArgs;
+
+            if (InputUtilities.IsTouchArgs(e))
+            {
+                _touchdownTimer.Tick += TouchingDownTickHandler;
+                _touchingDown = true;
+                _touchdownTimer.Start();
+            }
 
             // Ignore the click if clickCount != 1 or the user has clicked on a scrollbar.
             if ((mouseArgs != null && mouseArgs.ClickCount != 1)
@@ -596,12 +652,25 @@ namespace GongSolutions.Wpf.DragDrop
 
         private static void DragSource_PreviewMouseLeftButtonUp(object sender, InputEventArgs e)
         {
+            if (InputUtilities.IsTouchArgs(e))
+            {
+                Action<IDragInfo> touchUpHandler = GetTouchUpHandler((UIElement)sender);
+                touchUpHandler(m_DragInfo);
+
+                _touchingDown = false;
+                _isTouchDraggable = false;
+                _touchdownTimer.Stop();
+                _touchdownTimer.Tick -= TouchingDownTickHandler;
+            }
+
             // If we prevented the control's default selection handling in DragSource_PreviewMouseLeftButtonDown
             // by setting 'e.Handled = true' and a drag was not initiated, manually set the selection here.
             var itemsControl = sender as ItemsControl;
 
             if (itemsControl != null && m_DragInfo != null && m_ClickSupressItem == m_DragInfo.SourceItem)
             {
+
+
                 if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
                 {
                     itemsControl.SetItemSelected(m_DragInfo.SourceItem, false);
@@ -640,8 +709,22 @@ namespace GongSolutions.Wpf.DragDrop
 
             if (m_DragInfo != null && !m_DragInProgress)
             {
+
+                if (InputUtilities.IsTouchArgs(e))
+                {
+                    if (!_isTouchDraggable)
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        Action<IDragInfo> touchHoldHandler = GetTouchHoldHandler(sender as UIElement);
+                        touchHoldHandler(m_DragInfo);
+                    }
+                }
+
                 var dragStart = m_DragInfo.DragStartPosition;
-                var position = getInputPosition((IInputElement)sender);
+                var position = getInputPosition((IInputElement) sender);
 
                 if (Math.Abs(position.X - dragStart.X) > SystemParameters.MinimumHorizontalDragDistance ||
                     Math.Abs(position.Y - dragStart.Y) > SystemParameters.MinimumVerticalDragDistance)
@@ -687,13 +770,10 @@ namespace GongSolutions.Wpf.DragDrop
                 DropTargetAdorner = null;
             }
         }
-
         
-
         private static void DropTarget_PreviewDragEnter(object sender, DragEventArgs e)
         {
             DropTarget_PreviewDragOver(sender, e);
-
             Mouse.OverrideCursor = Cursors.Arrow;
         }
 
@@ -802,6 +882,9 @@ namespace GongSolutions.Wpf.DragDrop
 
         private static void DropTarget_PreviewDrop(object sender, DragEventArgs e)
         {
+            Action<IDragInfo> touchUpHandler = GetTouchUpHandler(sender as UIElement);
+            touchUpHandler(m_DragInfo);
+
             var dropInfo = new DropInfo(sender, e, m_DragInfo);
             var dropHandler = GetDropHandler((UIElement)sender) ?? DefaultDropHandler;
             var dragHandler = TryGetDragHandler(m_DragInfo, sender as UIElement);
@@ -809,7 +892,7 @@ namespace GongSolutions.Wpf.DragDrop
             DragAdorner = null;
             EffectAdorner = null;
             DropTargetAdorner = null;
-
+           
             dropHandler.Drop(dropInfo);
             dragHandler.Dropped(dropInfo);
 

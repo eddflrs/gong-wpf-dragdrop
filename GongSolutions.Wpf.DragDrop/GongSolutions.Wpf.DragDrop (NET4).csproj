@@ -79,6 +79,7 @@
     <Compile Include="IDragSource.cs" />
     <Compile Include="IDropTarget.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utilities\InputUtilities.cs" />
     <Compile Include="Utilities\ItemsControlExtensions.cs" />
     <Compile Include="Utilities\TypeUtilities.cs" />
     <Compile Include="Utilities\VisualTreeExtensions.cs" />
